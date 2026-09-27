@@ -1,0 +1,9 @@
+node_modules
+.env
+.pglite*
+dist
+.DS_Store
+# skill di terze parti installate localmente per Claude Code, non fanno parte del progetto
+.claude/skills/
+# prove locali di MOTIS con i dati del NAP (centinaia di MB)
+motis-lab/
