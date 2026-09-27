@@ -7,3 +7,6 @@ dist
 .claude/skills/
 # prove locali di MOTIS con i dati del NAP (centinaia di MB)
 motis-lab/
+
+# prompt da incollare nelle nuove chat (solo locale)
+prompt-nuove-chat/
