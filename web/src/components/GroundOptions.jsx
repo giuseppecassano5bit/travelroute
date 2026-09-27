@@ -1,4 +1,4 @@
-import { changes, clock, duration, modeLabel } from '../format.js';
+import { changes, clock, duration, euros, modeLabel } from '../format.js';
 
 const SHORT_WALK_MIN = 5; // i trasferimenti a piedi più brevi non vengono elencati tra le tappe
 
@@ -31,7 +31,7 @@ export function Departures({ transit }) {
               <summary>
                 <span className="dep-times">{clock(o.start, o.tz)} – {clock(o.end, o.tz)}</span>
                 <span className="dep-dur">{duration(o.durationMin)}</span>
-                <span className="dep-changes">{changes(o.transfers)}</span>
+                <span className="dep-changes">{changes(o.transfers)}{o.fare && <>, {euros(o.fare)}</>}</span>
                 {o === best && <span className="tag">la più rapida</span>}
               </summary>
               <ol className="legs">{legs.map((l, j) => <Leg key={j} leg={l} />)}</ol>
@@ -66,6 +66,7 @@ export function KnownParts({ known }) {
               <strong>{modeLabel(p.mode)} {p.operator}</strong> da {p.from} a {p.to}: circa {duration(p.durationMin)}
               {p.waitMin > 0 && `, più ${duration(p.waitMin)} di attesa media`}
               <small>
+                {p.fare && <>Biglietto {euros(p.fare)}. </>}
                 {p.service}. <a href={p.timetableUrl} target="_blank" rel="noopener">Orario ufficiale</a>,
                 {' '}dati verificati il {new Date(`${p.verifiedOn}T12:00:00`).toLocaleDateString('it-IT')}.
               </small>

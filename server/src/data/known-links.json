@@ -35,7 +35,7 @@
       "source": "Orario ferroviario FAL da e per Bari in vigore dal 31/08/2026 (80–90 min Gravina–Bari C.le)",
       "gap": "FAL non è in Transitous",
       "verifiedOn": "2026-09-27",
-      "fareKm": 60,
+      "fareEur": 5.3,
       "fareSource": "Tariffe FAL Regione Puglia (mod. 07): Gravina–Bari in fascia 60 km; prezzo della fascia 51–60 km della tariffa regionale Puglia (5,30 €)"
     }
   ]
