@@ -29,6 +29,7 @@ export function Example({ onUse }) {
       <h2 id="example-title" className="example-title">Un viaggio calcolato da noi</h2>
       <p className="example-sub">Da un paese della Murgia a una cittadina bulgara, un lunedì.</p>
       <ol className="mini-route">
+        <li className="traveler" aria-hidden />
         {STEPS.map((s, i) => (s.stop
           ? <li key={i} className={`mini-stop${s.end ? ' end' : ''}${i === 0 ? ' start' : ''}`}><span className="rail" aria-hidden />{s.stop}</li>
           : (
@@ -42,9 +43,12 @@ export function Example({ onUse }) {
       <p className="example-total">
         <strong>8 h 19 min</strong> porta a porta, <strong>circa 35–100 €</strong> a persona
       </p>
-      <button type="button" className="ghost" onClick={() => onUse({ ...EXAMPLE, date: nextMonday() })}>
-        Usa questo esempio nella ricerca
-      </button>
+      <div className="example-actions">
+        <button type="button" className="ghost" onClick={() => onUse({ ...EXAMPLE, date: nextMonday() })}>
+          Usa questo esempio nella ricerca
+        </button>
+        <a className="ghost trip-3d" href="/viaggio.html">Fai questo viaggio in 3D</a>
+      </div>
     </aside>
   );
 }

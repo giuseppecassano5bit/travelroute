@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Da Gravina a Karlovo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Stessa identità del sito: carta chiara, inchiostro, verde per i treni, magenta per il volo. */
+:root {
+  --ink: #172a3a;
+  --ink-2: #4e5f6d;
+  --paper: #f1f4ef;
+  --surface: #ffffff;
+  --rule: #cfd7d0;
+  --rail: #1e7a52;
+  --air: #b3246f;
+  --glow: #f2a93b;
+  --focus: #1d5fa8;
+  color-scheme: light;
+}
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--ink); color: var(--ink); overflow: hidden; touch-action: none;
+  font-family: 'Overpass', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; }
+#scene:active { cursor: grabbing; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+[hidden] { display: none !important; }
+
+.hud {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 2; pointer-events: none;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 0;
+}
+.hud > * { pointer-events: auto; }
+.panel { background: rgb(241 244 239 / 90%); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-radius: 8px; }
+.legbox { padding: 10px 14px 12px; min-width: 0; max-width: 60vw; }
+.legname { font-weight: 800; font-size: 15px; line-height: 1.2; }
+.legcount { font-size: 13px; color: var(--ink-2); }
+.legline { display: flex; align-items: center; margin-top: 8px; }
+.legline .dot { width: 11px; height: 11px; flex: none; border-radius: 50%; border: 2.5px solid var(--ink); background: var(--surface); box-sizing: border-box; }
+.legline .dot.passed { background: var(--ink); }
+.legline .dot.now { box-shadow: 0 0 0 3px rgb(23 42 58 / 18%); }
+.legline .seg { width: 20px; height: 4px; background: var(--rail); }
+.legline .seg.air { background: var(--air); }
+.legline .seg.todo { opacity: 0.3; }
+.legprogress { height: 3px; margin-top: 8px; background: var(--rule); border-radius: 2px; overflow: hidden; }
+.legprogress span { display: block; height: 100%; width: 0; background: var(--ink); }
+.lights { font-size: 13px; color: var(--ink-2); margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+.tools { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.sound { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; }
+.icon-button {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 6px;
+  border: 0; background: transparent; color: var(--ink); cursor: pointer;
+}
+.icon-button:hover { background: rgb(23 42 58 / 8%); }
+.icon-button svg { width: 22px; height: 22px; }
+#volume { width: 110px; accent-color: var(--ink); }
+.close { font-weight: 600; font-size: 14px; color: var(--ink); text-decoration: none; padding: 8px 12px; }
+.close:hover { text-decoration: underline; }
+
+.hint {
+  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); z-index: 2;
+  transform: translateX(-50%); max-width: calc(100% - 32px); text-align: center;
+  padding: 8px 14px; font-size: 14px; transition: opacity 0.8s;
+}
+.hint.gone { opacity: 0; pointer-events: none; }
+
+/* Cartoline: stesso trattamento della scheda d'esempio del sito */
+.card {
+  position: fixed; z-index: 3; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px)); box-sizing: border-box;
+  background: var(--surface); border-top: 6px solid var(--ink); border-radius: 4px 4px 10px 10px;
+  padding: 24px 26px 26px; box-shadow: 0 18px 50px rgb(10 20 30 / 35%);
+}
+.card h1, .card h2 { margin: 0; font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
+.card h1 { font-size: clamp(28px, 7vw, 38px); }
+.card h2 { font-size: clamp(26px, 6vw, 34px); }
+.card p { margin: 10px 0 0; color: var(--ink-2); }
+.card .kicker { margin: 0 0 6px; color: var(--ink-2); font-size: 15px; }
+.card .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.btn {
+  font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; text-decoration: none;
+  padding: 12px 20px; border-radius: 6px; border: 2px solid var(--ink); background: var(--ink); color: var(--paper);
+}
+.btn:hover { background: var(--rail); border-color: var(--rail); }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.stops { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 2px; font-size: 15px; }
+.stops li { display: grid; grid-template-columns: 16px 1fr; gap: 10px; align-items: center; }
+.stops li::before { content: ''; width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid var(--ink); box-sizing: border-box; justify-self: center; }
+.stops .air::before { border-color: var(--air); }
+
+/* Titolo della tappa: compare in basso a sinistra e poi se ne va */
+.title-card {
+  position: fixed; z-index: 2; left: 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  max-width: min(440px, calc(100% - 32px));
+  background: var(--surface); border-top: 6px solid var(--ink); border-radius: 4px 4px 10px 10px;
+  padding: 16px 20px 18px; box-shadow: 0 12px 36px rgb(10 20 30 / 30%);
+  transition: opacity 0.9s, transform 0.9s;
+}
+.title-card.gone { opacity: 0; transform: translateY(12px); pointer-events: none; }
+.title-card .kicker { margin: 0; color: var(--ink-2); font-size: 14px; }
+.title-card h2 { margin: 2px 0 0; font-size: clamp(26px, 5.5vw, 36px); font-weight: 800; letter-spacing: -0.02em; line-height: 1.1; }
+.title-card p { margin: 8px 0 0; color: var(--ink-2); font-size: 15px; }
+@media (prefers-reduced-motion: reduce) {
+  .title-card, .hint { transition: opacity 0.3s; }
+  .title-card.gone { transform: none; }
+}
+@media (max-width: 520px) {
+  #volume { width: 80px; }
+  .legbox { max-width: 58vw; }
+  .card { top: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-height: calc(100% - 190px); overflow-y: auto; }
+}
+</style>
+</head>
+<body>
+<canvas id="scene" tabindex="0" aria-label="Scena 3D del viaggio: trascina per guardarti intorno, oppure usa le frecce"></canvas>
+
+<div class="hud">
+  <div class="legbox panel" aria-live="polite">
+    <div class="legname" id="legname">Gravina in Puglia</div>
+    <div class="legcount" id="legcount">Tappa 1 di 6</div>
+    <div class="legline" id="legline" aria-hidden="true"></div>
+    <div class="legprogress" aria-hidden="true"><span id="legprogress"></span></div>
+    <div class="lights" id="lights" hidden></div>
+  </div>
+  <div class="tools">
+    <div class="sound panel">
+      <button type="button" class="icon-button" id="mute" aria-pressed="false" aria-label="Disattiva l'audio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/>
+          <path id="wave1" d="M16 9.5a3.5 3.5 0 0 1 0 5"/>
+          <path id="wave2" d="M18.5 7a7 7 0 0 1 0 10"/>
+          <path id="cross" d="M16 9l5 6m0-6l-5 6" hidden/>
+        </svg>
+      </button>
+      <label for="volume" class="legcount">Volume</label>
+      <input id="volume" type="range" min="0" max="100" value="40">
+    </div>
+    <a class="close panel" id="close" href="/" hidden>Torna alla ricerca</a>
+  </div>
+</div>
+
+<p class="hint panel gone" id="hint"></p>
+
+<section class="title-card gone" id="titlecard" aria-live="polite">
+  <p class="kicker" id="tc-kicker"></p>
+  <h2 id="tc-name"></h2>
+  <p id="tc-sub"></p>
+</section>
+
+<section class="card" id="startcard">
+  <p class="kicker">Il viaggio d'esempio del sito, da vivere</p>
+  <h1>Da Gravina a Karlovo</h1>
+  <p>Sei tappe in treno e in aereo, da un paese della Murgia alla Valle delle Rose in Bulgaria. Non si può sbagliare: guardati intorno e goditi il viaggio.</p>
+  <ol class="stops" id="startstops"></ol>
+  <p id="controls-hint"></p>
+  <div class="actions">
+    <button type="button" class="btn" id="start">Parti</button>
+  </div>
+</section>
+
+<section class="card" id="endcard" hidden>
+  <p class="kicker" id="end-kicker"></p>
+  <h2 id="end-title"></h2>
+  <p id="end-text"></p>
+  <div class="actions" id="end-actions"></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.158.0/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================================================
+   Da Gravina a Karlovo: il viaggio d'esempio del sito in sei tappe, tutto procedurale (niente modelli,
+   texture o suoni scaricati). Sistemi condivisi: renderer, camera che orbita attorno al mezzo, comandi,
+   audio Web Audio con dissolvenze tra le tappe, schede. Ogni tappa è una funzione che costruisce la sua scena.
+   ===================================================================================================== */
+
+const LEGS = [
+  { name: 'Gravina in Puglia', mode: 'rail', kicker: 'Tappa 1 di 6, treno FAL all\'alba',
+    sub: 'Il treno lascia la città sulla gravina. Guarda le case sul burrone: al tuo sguardo si accendono.', build: buildGravina },
+  { name: 'La Murgia', mode: 'rail', kicker: 'Tappa 2 di 6, treno FAL verso Bari' },
+  { name: 'Bari', mode: 'rail', kicker: 'Tappa 3 di 6, treno per l\'aeroporto' },
+  { name: 'In volo sui Balcani', mode: 'air', kicker: 'Tappa 4 di 6, volo per Sofia' },
+  { name: 'Sofia', mode: 'rail', kicker: 'Tappa 5 di 6, metro e treno' },
+  { name: 'Karlovo, Valle delle Rose', mode: 'rail', kicker: 'Tappa 6 di 6, treno BDŽ' },
+];
+
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+// Numeri casuali ripetibili: la scena è uguale a ogni visita.
+function rng(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ----------------------------------------------- Audio ----------------------------------------------- */
+const Sound = (() => {
+  let ctx, master, musicBus, sfxBus, ambBus, delayIn, reverbIn, noiseBuf;
+  let volume = 0.4, muted = false;
+  let score = null, step = 0, nextTime = 0, timer = null, chimeQueue = 0;
+  let padVoices = [], windNode = null, rumble = null, birdTimer = 0;
+  const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function init() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.ratio.value = 3;
+    master = ctx.createGain(); master.gain.value = muted ? 0 : volume;
+    master.connect(comp).connect(ctx.destination);
+    sfxBus = ctx.createGain(); sfxBus.gain.value = 0.9; sfxBus.connect(master);
+    ambBus = ctx.createGain(); ambBus.gain.value = 0.8; ambBus.connect(master);
+
+    // Rumore bianco: vento, rotaie, respiro del motore.
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+
+    // Riverbero da una risposta all'impulso generata (rumore che si spegne), niente file.
+    const conv = ctx.createConvolver();
+    const len = Math.floor(ctx.sampleRate * 2.8);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    conv.buffer = ir;
+    reverbIn = ctx.createGain(); reverbIn.gain.value = 0.5;
+    const revOut = ctx.createGain(); revOut.gain.value = 0.55;
+    reverbIn.connect(conv).connect(revOut).connect(master);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!ctx) return;
+      if (document.hidden) ctx.suspend(); else ctx.resume();
+    });
+  }
+
+  function newMusicBus() {
+    const bus = ctx.createGain(); bus.gain.value = 0.0001; bus.connect(master);
+    // Eco a tempo, con un filtro nel giro di ritorno: gli arpeggi si allargano senza impastarsi.
+    const d = ctx.createDelay(2); const fb = ctx.createGain(); const lp = ctx.createBiquadFilter(); const wet = ctx.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = 2200; fb.gain.value = 0.32; wet.gain.value = 0.32;
+    d.connect(lp).connect(fb).connect(d); d.connect(wet).connect(bus);
+    bus._delay = d;
+    return bus;
+  }
+
+  function pluck(midi, t, o = {}) {
+    const f = mtof(midi), dur = o.dur ?? 1.6, gain = o.gain ?? 0.16, bus = o.bus ?? musicBus;
+    const o1 = ctx.createOscillator(); o1.type = o.type ?? 'triangle'; o1.frequency.value = f;
+    const o2 = ctx.createOscillator(); o2.type = 'sine'; o2.frequency.value = f * 2;
+    const g2 = ctx.createGain(); g2.gain.value = o.shimmer ?? 0.22;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(o.bright ?? 2600, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(250, f * 1.4), t + dur * 0.6);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const pan = ctx.createStereoPanner(); pan.pan.value = o.pan ?? 0;
+    o1.connect(lp); o2.connect(g2).connect(lp); lp.connect(g).connect(pan).connect(bus);
+    if (bus._delay && (o.echo ?? 0.35) > 0) { const s = ctx.createGain(); s.gain.value = o.echo ?? 0.35; g.connect(s).connect(bus._delay); }
+    const r = ctx.createGain(); r.gain.value = o.reverb ?? 0.3; g.connect(r).connect(reverbIn);
+    o1.start(t); o2.start(t); o1.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+  }
+
+  // Accordo tenuto: archi morbidi (due denti di sega poco stonati per nota, filtrati).
+  function pad(notes, t, len) {
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(score.padGain, t + 2.2);
+    out.gain.setValueAtTime(score.padGain, t + len);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + len + 2.6);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = score.padCutoff; lp.Q.value = 0.4;
+    lp.connect(out).connect(musicBus);
+    const rs = ctx.createGain(); rs.gain.value = 0.4; out.connect(rs).connect(reverbIn);
+    for (const n of notes) {
+      for (const det of [-7, 6]) {
+        const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(n); o.detune.value = det;
+        o.connect(lp); o.start(t); o.stop(t + len + 2.8);
+      }
+    }
+    const b = ctx.createOscillator(); b.type = 'sine'; b.frequency.value = mtof(notes[0] - 12);
+    const bg = ctx.createGain();
+    bg.gain.setValueAtTime(0.0001, t); bg.gain.exponentialRampToValueAtTime(0.08, t + 1.2);
+    bg.gain.setValueAtTime(0.08, t + len); bg.gain.exponentialRampToValueAtTime(0.0001, t + len + 2.2);
+    b.connect(bg).connect(musicBus); b.start(t); b.stop(t + len + 2.4);
+  }
+
+  function scheduleStep(i, t) {
+    const s = score, eighth = 30 / s.bpm;
+    const ci = Math.floor(i / s.stepsPerChord) % s.chords.length;
+    const chord = s.chords[ci];
+    if (i % s.stepsPerChord === 0) pad(chord.slice(1, 4), t, s.stepsPerChord * eighth);
+    const pos = i % s.pattern.length;
+    if (pos === 0) pluck(chord[0], t, { gain: 0.13, dur: 2.6, bright: 900, echo: 0.1 });
+    const p = s.pattern[pos];
+    if (p !== null && Math.random() > s.skip) {
+      pluck(chord[p] + 12, t, { gain: 0.1 + Math.random() * 0.03, dur: 1.5, pan: (Math.random() - 0.5) * 0.5 });
+    }
+    if (Math.random() < s.sparkle) {
+      pluck(chord[2 + Math.floor(Math.random() * 3)] + 24, t + eighth / 2, { gain: 0.035, dur: 1.2, bright: 5200, reverb: 0.6 });
+    }
+    if (chimeQueue > 0) {
+      chimeQueue--;
+      const tones = chord.slice(2);
+      pluck(tones[Math.floor(Math.random() * tones.length)] + 24, t, {
+        bus: sfxBus, gain: 0.11, dur: 2.4, bright: 6000, shimmer: 0.45, reverb: 0.7, echo: 0, pan: (Math.random() - 0.5) * 0.8,
+      });
+    }
+  }
+
+  function tick() {
+    if (!score) return;
+    const eighth = 30 / score.bpm;
+    while (nextTime < ctx.currentTime + 0.2) { scheduleStep(step, nextTime); nextTime += eighth; step++; }
+  }
+
+  // Vento: rumore filtrato che respira lentamente.
+  function startWind(level) {
+    stopWind();
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 480; bp.Q.value = 0.6;
+    const g = ctx.createGain(); g.gain.value = 0.0001;
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.09; const lg = ctx.createGain(); lg.gain.value = level * 0.45;
+    lfo.connect(lg).connect(g.gain);
+    g.gain.setTargetAtTime(level, ctx.currentTime, 2);
+    src.connect(bp).connect(g).connect(ambBus); src.start(); lfo.start();
+    windNode = { src, lfo, g };
+  }
+  function stopWind() {
+    if (!windNode) return;
+    const w = windNode; windNode = null;
+    w.g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.8);
+    setTimeout(() => { w.src.stop(); w.lfo.stop(); }, 3000);
+  }
+
+  return {
+    get ready() { return !!ctx; },
+    get now() { return ctx ? ctx.currentTime : 0; },
+    start() { init(); ctx.resume(); if (!timer) timer = setInterval(tick, 25); },
+    setVolume(v) { volume = v; if (master && !muted) master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); },
+    setMuted(m) { muted = m; if (master) master.gain.setTargetAtTime(m ? 0 : volume, ctx.currentTime, 0.05); },
+    // Nuova musica per la tappa: la vecchia sfuma mentre la nuova entra.
+    playLeg(sc) {
+      if (!ctx) return;
+      const t = ctx.currentTime;
+      if (musicBus) { const old = musicBus; old.gain.setTargetAtTime(0.0001, t, 0.9); setTimeout(() => old.disconnect(), 6000); }
+      musicBus = newMusicBus();
+      musicBus.gain.setValueAtTime(0.0001, t);
+      musicBus.gain.exponentialRampToValueAtTime(1, t + 3.5);
+      score = sc; step = 0; nextTime = t + 0.1;
+      startWind(sc.wind ?? 0.02);
+    },
+    // Una finestra accesa suona una nota dell'accordo, allineata al prossimo ottavo.
+    chime() { if (ctx) chimeQueue = Math.min(chimeQueue + 1, 4); },
+    // Chiacchiericcio di rondini e il verso del grillaio, ogni tanto.
+    birds(dt) {
+      if (!ctx) return;
+      birdTimer -= dt;
+      if (birdTimer > 0) return;
+      birdTimer = 3 + Math.random() * 6;
+      const t0 = ctx.currentTime + 0.05, kestrel = Math.random() < 0.35;
+      const n = kestrel ? 4 + Math.floor(Math.random() * 3) : 2 + Math.floor(Math.random() * 3);
+      const pan = ctx.createStereoPanner(); pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(ambBus);
+      for (let k = 0; k < n; k++) {
+        const t = t0 + k * (kestrel ? 0.13 : 0.09 + Math.random() * 0.08);
+        const o = ctx.createOscillator(); o.type = 'sine';
+        const base = kestrel ? 3300 : 2600 + Math.random() * 1400;
+        o.frequency.setValueAtTime(base, t);
+        o.frequency.linearRampToValueAtTime(base * (kestrel ? 1.12 : 1.35), t + 0.035);
+        o.frequency.linearRampToValueAtTime(base * 0.92, t + 0.09);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(kestrel ? 0.035 : 0.025, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+        o.connect(g).connect(pan); o.start(t); o.stop(t + 0.12);
+      }
+    },
+    // Giunti delle rotaie: due colpetti (un carrello) ogni tanti metri, più il rombo del motore.
+    clack(speed) {
+      if (!ctx || speed < 0.5) return;
+      const t = ctx.currentTime + 0.02, vol = 0.02 + 0.03 * clamp(speed / 14, 0, 1);
+      for (const off of [0, 0.11]) {
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1900; bp.Q.value = 1.4;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t + off); g.gain.exponentialRampToValueAtTime(vol, t + off + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.05);
+        src.connect(bp).connect(g).connect(sfxBus);
+        src.start(t + off, Math.random()); src.stop(t + off + 0.07);
+      }
+    },
+    engine(speed) {
+      if (!ctx) return;
+      if (!rumble) {
+        const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
+        const g = ctx.createGain(); g.gain.value = 0.0001;
+        src.connect(lp).connect(g).connect(sfxBus); src.start();
+        rumble = { g, lp };
+      }
+      rumble.g.gain.setTargetAtTime(0.02 + 0.07 * clamp(speed / 14, 0, 1), ctx.currentTime, 0.4);
+      rumble.lp.frequency.setTargetAtTime(120 + speed * 9, ctx.currentTime, 0.4);
+    },
+    // Tromba bitonale di un'automotrice diesel alla partenza.
+    horn() {
+      if (!ctx) return;
+      const t = ctx.currentTime + 0.05;
+      [[0, 0.55, 370], [0.6, 0.9, 311]].forEach(([a, b, f]) => {
+        const g = ctx.createGain(); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1500;
+        g.gain.setValueAtTime(0.0001, t + a); g.gain.exponentialRampToValueAtTime(0.05, t + a + 0.04);
+        g.gain.setValueAtTime(0.05, t + b - 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + b);
+        lp.connect(g).connect(sfxBus);
+        const r = ctx.createGain(); r.gain.value = 0.5; g.connect(r).connect(reverbIn);
+        for (const m of [1, 1.5]) {
+          const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f * m;
+          o.connect(lp); o.start(t + a); o.stop(t + b + 0.05);
+        }
+      });
+    },
+  };
+})();
+
+/* ---------------------------------------------- Renderer --------------------------------------------- */
+const canvas = $('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+let pixelRatio = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 1.75);
+renderer.setPixelRatio(pixelRatio);
+renderer.setSize(innerWidth, innerHeight, false);
+let shadowsOn = !coarse;
+renderer.shadowMap.enabled = shadowsOn;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(coarse && innerWidth < innerHeight ? 62 : 50, innerWidth / innerHeight, 0.5, 4200);
+
+addEventListener('resize', () => {
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight;
+  camera.fov = coarse && innerWidth < innerHeight ? 62 : 50;
+  camera.updateProjectionMatrix();
+});
+
+// Cielo: sfumatura verso l'orizzonte, bagliore del sole e, dal lato opposto, la fascia rosa dell'alba.
+function makeSky() {
+  const uniforms = {
+    top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() }, glow: { value: new THREE.Color() },
+    belt: { value: new THREE.Color() }, ground: { value: new THREE.Color() }, sunColor: { value: new THREE.Color() },
+    sunDir: { value: new THREE.Vector3(1, 0.1, 0) },
+  };
+  const mat = new THREE.ShaderMaterial({
+    uniforms, side: THREE.BackSide, depthWrite: false, fog: false,
+    vertexShader: `varying vec3 vDir;
+      void main() { vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 top, horizon, glow, belt, ground, sunColor, sunDir; varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        float h = d.y;
+        float toward = dot(normalize(d.xz + 1e-4), normalize(sunDir.xz)) * 0.5 + 0.5;
+        vec3 hor = mix(belt, glow, pow(toward, 2.2));
+        vec3 col = mix(hor, horizon, smoothstep(0.0, 0.12, h));
+        col = mix(col, top, smoothstep(0.08, 0.6, h));
+        col = mix(col, ground, smoothstep(0.0, -0.08, h));
+        float s = max(dot(d, normalize(sunDir)), 0.0);
+        col += sunColor * (pow(s, 900.0) * 4.0 + pow(s, 40.0) * 0.35 + pow(s, 6.0) * 0.12);
+        gl_FragColor = vec4(col, 1.0);
+        #include <colorspace_fragment>
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(3000, 32, 16), mat); // segue la camera, dentro il piano di fondo
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -1;
+  return { mesh, uniforms };
+}
+const sky = makeSky();
+scene.add(sky.mesh);
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1.4);
+const sun = new THREE.DirectionalLight(0xffffff, 2.6);
+sun.castShadow = shadowsOn;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, near: 10, far: 700 });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.6;
+scene.add(hemi, sun, sun.target);
+scene.fog = new THREE.Fog(0xffffff, 150, 1400);
+
+// Texture morbide disegnate su canvas: bagliore delle finestre e nebbia nella gravina.
+function glowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+function mistTexture(seed) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'); const r = rng(seed);
+  for (let i = 0; i < 70; i++) {
+    const x = 30 + r() * 196, y = 40 + r() * 176, rad = 20 + r() * 60;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, `rgba(255,255,255,${0.08 + r() * 0.12})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping;
+  return tex;
+}
+function signTexture(text) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 112;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1f4e8c'; g.fillRect(0, 0, 512, 112);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 6; g.strokeRect(8, 8, 496, 96);
+  g.fillStyle = '#ffffff'; g.font = '800 50px Overpass, "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 256, 60);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+/* --------------------------------------------- Comandi ----------------------------------------------- */
+// Lo sguardo gira attorno al treno: trascinare (mouse, dito), scorrere col trackpad o le frecce.
+const look = { yaw: 0, pitch: 0, ty: 0, tp: 0, touched: false };
+const YAW_MAX = 1.9, PITCH_MIN = -0.3, PITCH_MAX = 0.7;
+function nudge(dx, dy) {
+  look.ty = clamp(look.ty + dx, -YAW_MAX, YAW_MAX);
+  look.tp = clamp(look.tp + dy, PITCH_MIN, PITCH_MAX);
+  if (!look.touched) { look.touched = true; setTimeout(hideHint, 1800); }
+}
+let drag = null;
+canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, id: e.pointerId }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  const k = e.pointerType === 'touch' ? 0.0065 : 0.0045;
+  nudge(-(e.clientX - drag.x) * k, (e.clientY - drag.y) * k * 0.8);
+  drag.x = e.clientX; drag.y = e.clientY;
+});
+const endDrag = () => { drag = null; };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const k = e.deltaMode === 1 ? 0.03 : 0.0016;
+  nudge(-e.deltaX * k, -e.deltaY * k * 0.7);
+}, { passive: false });
+const keys = new Set();
+addEventListener('keydown', (e) => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) && !(e.target instanceof HTMLInputElement)) {
+    keys.add(e.key); e.preventDefault();
+  }
+  if (e.key === 'm' || e.key === 'M') toggleMute();
+});
+addEventListener('keyup', (e) => keys.delete(e.key));
+function applyKeys(dt) {
+  const s = 1.4 * dt;
+  if (keys.has('ArrowLeft')) nudge(s, 0);
+  if (keys.has('ArrowRight')) nudge(-s, 0);
+  if (keys.has('ArrowUp')) nudge(0, s * 0.6);
+  if (keys.has('ArrowDown')) nudge(0, -s * 0.6);
+}
+
+/* ---------------------------------------------- Interfaccia ------------------------------------------ */
+function renderLegLine(current, done) {
+  const box = $('legline'); box.textContent = '';
+  LEGS.forEach((l, i) => {
+    if (i > 0) {
+      const s = document.createElement('span');
+      s.className = `seg${(LEGS[i - 1].mode === 'air' || l.mode === 'air') ? ' air' : ''}${i > current ? ' todo' : ''}`;
+      box.append(s);
+    }
+    const d = document.createElement('span');
+    d.className = `dot${i < current || (i === current && done) ? ' passed' : ''}${i === current ? ' now' : ''}`;
+    box.append(d);
+  });
+}
+const startStops = $('startstops');
+LEGS.forEach((l) => { const li = document.createElement('li'); li.textContent = l.name; if (l.mode === 'air') li.className = 'air'; startStops.append(li); });
+$('controls-hint').textContent = coarse
+  ? 'Trascina con un dito per guardarti intorno. L\'audio parte con il viaggio: puoi abbassarlo in alto a destra.'
+  : 'Trascina, oppure scorri con due dita sul trackpad, per guardarti intorno; vanno bene anche le frecce. L\'audio parte con il viaggio: puoi abbassarlo in alto a destra.';
+
+let hintTimer;
+function showHint(text) {
+  const h = $('hint'); h.textContent = text; h.classList.remove('gone');
+  clearTimeout(hintTimer); hintTimer = setTimeout(hideHint, 9000);
+}
+function hideHint() { $('hint').classList.add('gone'); }
+
+let titleTimer;
+function showTitle(leg) {
+  $('tc-kicker').textContent = leg.kicker; $('tc-name').textContent = leg.name; $('tc-sub').textContent = leg.sub ?? '';
+  const t = $('titlecard'); t.classList.remove('gone');
+  clearTimeout(titleTimer); titleTimer = setTimeout(() => t.classList.add('gone'), 6500);
+}
+
+function toggleMute() {
+  const b = $('mute'); const m = b.getAttribute('aria-pressed') !== 'true';
+  b.setAttribute('aria-pressed', String(m));
+  b.setAttribute('aria-label', m ? 'Attiva l\'audio' : 'Disattiva l\'audio');
+  $('wave1').toggleAttribute('hidden', m); $('wave2').toggleAttribute('hidden', m); $('cross').toggleAttribute('hidden', !m);
+  Sound.setMuted(m);
+}
+$('mute').addEventListener('click', toggleMute);
+$('volume').addEventListener('input', (e) => {
+  Sound.setVolume(e.target.value / 100);
+  if (e.target.value > 0 && $('mute').getAttribute('aria-pressed') === 'true') toggleMute();
+});
+// Dentro il sito si torna alla ricerca; nell'anteprima incorporata il link non servirebbe.
+if (window.self === window.top && location.pathname.endsWith('viaggio.html')) $('close').hidden = false;
+
+function endCard({ kicker, title, text, actions }) {
+  $('end-kicker').textContent = kicker; $('end-title').textContent = title; $('end-text').textContent = text;
+  const box = $('end-actions'); box.textContent = '';
+  actions.forEach(([label, fn, ghost]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = `btn${ghost ? ' ghost' : ''}`; b.textContent = label;
+    b.addEventListener('click', fn); box.append(b);
+  });
+  $('endcard').hidden = false;
+  box.firstChild?.focus();
+}
+
+/* ---------------------------------------------- Tappe ------------------------------------------------ */
+let legIndex = 0, leg = null, started = false;
+
+function disposeTree(obj) {
+  obj.traverse((o) => {
+    o.geometry?.dispose();
+    const m = o.material; if (!m) return;
+    (Array.isArray(m) ? m : [m]).forEach((x) => { x.map?.dispose(); x.dispose(); });
+  });
+}
+
+function startLeg(i) {
+  if (leg) { scene.remove(leg.group); disposeTree(leg.group); }
+  legIndex = i;
+  leg = LEGS[i].build();
+  scene.add(leg.group);
+  look.ty = look.tp = 0;
+  renderLegLine(i, false);
+  $('legname').textContent = LEGS[i].name;
+  $('legcount').textContent = `Tappa ${i + 1} di ${LEGS.length}`;
+  $('endcard').hidden = true;
+  if (started) { Sound.playLeg(leg.score); showTitle(LEGS[i]); }
+}
+
+function finishLeg() {
+  renderLegLine(legIndex, true);
+  const next = LEGS[legIndex + 1];
+  const summary = leg.summary?.() ?? '';
+  if (next && next.build) {
+    endCard({ kicker: 'Fine della tappa', title: `Prossima fermata: ${next.name}`, text: summary,
+      actions: [[`Tappa successiva: ${next.name}`, () => startLeg(legIndex + 1)]] });
+  } else if (next) {
+    endCard({ kicker: 'Fine della tappa', title: `Prossima fermata: ${next.name}`, text: summary,
+      actions: [['Tappa successiva', () => endCard({
+        kicker: `${next.kicker}`, title: 'Questa tappa è in costruzione',
+        text: 'Per ora si può fare solo la prima tappa: le altre arrivano dopo le tue note.',
+        actions: [['Rifai la tappa 1', () => startLeg(0)], ...(!$('close').hidden ? [['Torna alla ricerca', () => { location.href = '/'; }, true]] : [])],
+      })]] });
+  }
+}
+
+/* ============================== Tappa 1: Gravina in Puglia, all'alba ============================== */
+function buildGravina() {
+  const group = new THREE.Group();
+  const R = rng(7);
+
+  // La gravina: un burrone che serpeggia lungo z. Il treno corre sul ciglio est, la città sta sul ciglio ovest.
+  const RH = 27, RD = 50;
+  const ravineX = (z) => 55 * Math.sin(z * 0.0055) + 16 * Math.sin(z * 0.0171 + 1.3);
+  const trackX = (z) => ravineX(z) + 66;
+  const trackY = (z) => 1.1 * Math.sin(z * 0.0047);
+  const TW = 1400, TL = 1600;
+  function plateau(x, z) {
+    return 2.2 * Math.sin(x * 0.013 + 0.7) * Math.cos(z * 0.011) + 1.2 * Math.sin(x * 0.041 + z * 0.027) + 0.45 * Math.sin(x * 0.13 - z * 0.11);
+  }
+  function height(x, z) {
+    const edge = 1 - smooth(0.82, 1, Math.max(Math.abs(x) / (TW / 2), Math.abs(z) / (TL / 2)));
+    let h = plateau(x, z) * edge;
+    const d = Math.abs(x - ravineX(z));
+    const depth = RD * (1 - smooth(560, 760, Math.abs(z)));
+    if (d < RH) {
+      const t = d / RH;
+      const k = 1 - smooth(0.4, 0.93, t);
+      const terr = Math.sin(t * 15 + z * 0.05) * 1.6;
+      h = h * (1 - k) - depth * k + terr * k * (1 - k) * 2.2;
+    }
+    const kt = 1 - smooth(3.5, 12, Math.abs(x - trackX(z)));
+    return h * (1 - kt) + (trackY(z) - 0.35) * kt;
+  }
+
+  // Terreno a colori per vertice: campi della Murgia a toppe, pareti di tufo a strati, fondo verde.
+  const C = (h) => new THREE.Color(h);
+  const fields = [C(0xd4b576), C(0xbcab62), C(0x9a7d52), C(0x9fae62), C(0xc9a862), C(0xdcc38a)];
+  const tufa = C(0xd4be94), tufaDark = C(0xb09772), bush = C(0x76804a), bottom = C(0x6b7846), ballast = C(0x8e887e), town = C(0xcfc2a2);
+  const tmp = new THREE.Color();
+  function hash(a, b) { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); }
+  function terrainColor(x, y, z) {
+    const d = Math.abs(x - ravineX(z));
+    if (Math.abs(x - trackX(z)) < 2.6) return tmp.copy(ballast);
+    if (d < RH && y < -2) {
+      if (y < -RD + 7) return tmp.copy(bottom).lerp(bush, hash(Math.floor(x / 9), Math.floor(z / 9)) * 0.6);
+      tmp.copy(tufa).lerp(tufaDark, (Math.sin(y * 0.8 + Math.sin(z * 0.03) * 2) * 0.5 + 0.5) * 0.7);
+      if (hash(Math.floor(x / 6), Math.floor(z / 6)) > 0.72) tmp.lerp(bush, 0.6);
+      return tmp;
+    }
+    const inTown = z > -80 && z < 170 && x < ravineX(z) - RH + 4 && x > ravineX(z) - RH - 105;
+    if (inTown) return tmp.copy(town);
+    const cx = Math.floor((x + 0.35 * z) / 74), cz = Math.floor((z - 0.22 * x) / 58);
+    tmp.copy(fields[Math.floor(hash(cx, cz) * fields.length)]);
+    return tmp.multiplyScalar(0.94 + hash(Math.floor(x / 5), Math.floor(z / 5)) * 0.1);
+  }
+  const tg = new THREE.PlaneGeometry(TW, TL, coarse ? 200 : 280, coarse ? 230 : 320);
+  tg.rotateX(-Math.PI / 2);
+  const tp = tg.attributes.position;
+  const tcol = new Float32Array(tp.count * 3);
+  for (let i = 0; i < tp.count; i++) {
+    const x = tp.getX(i), z = tp.getZ(i), y = height(x, z);
+    tp.setY(i, y);
+    const c = terrainColor(x, y, z); tcol[i * 3] = c.r; tcol[i * 3 + 1] = c.g; tcol[i * 3 + 2] = c.b;
+  }
+  tg.setAttribute('color', new THREE.BufferAttribute(tcol, 3));
+  tg.computeVertexNormals();
+  const terrain = new THREE.Mesh(tg, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  terrain.receiveShadow = true;
+  group.add(terrain);
+
+  // Oltre il terreno dettagliato: pianoro piatto fino all'orizzonte e un anello di colline lontane.
+  const outerShape = new THREE.Shape([new THREE.Vector2(-4000, -4000), new THREE.Vector2(4000, -4000), new THREE.Vector2(4000, 4000), new THREE.Vector2(-4000, 4000)]);
+  outerShape.holes.push(new THREE.Path([new THREE.Vector2(-TW / 2 + 2, -TL / 2 + 2), new THREE.Vector2(-TW / 2 + 2, TL / 2 - 2), new THREE.Vector2(TW / 2 - 2, TL / 2 - 2), new THREE.Vector2(TW / 2 - 2, -TL / 2 + 2)]));
+  const outer = new THREE.Mesh(new THREE.ShapeGeometry(outerShape), new THREE.MeshLambertMaterial({ color: 0xb8a672 }));
+  outer.rotation.x = -Math.PI / 2;
+  group.add(outer);
+  const hills = new THREE.BufferGeometry();
+  const hv = [], hSeg = 160;
+  for (let i = 0; i <= hSeg; i++) {
+    const a = (i / hSeg) * Math.PI * 2;
+    const hh = 30 + 26 * Math.sin(a * 3 + 1) * Math.sin(a * 7 + 0.4) + 14 * Math.sin(a * 13);
+    hv.push(Math.cos(a) * 2200, -2, Math.sin(a) * 2200, Math.cos(a) * 2400, Math.max(8, hh), Math.sin(a) * 2400);
+  }
+  const hi = [];
+  for (let i = 0; i < hSeg; i++) { const a = i * 2; hi.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  hills.setAttribute('position', new THREE.Float32BufferAttribute(hv, 3)); hills.setIndex(hi); hills.computeVertexNormals();
+  const hillMat = new THREE.MeshBasicMaterial({ color: 0x9d93a8, side: THREE.DoubleSide });
+  group.add(new THREE.Mesh(hills, hillMat));
+
+  // Binario: curva lungo il ciglio est, rotaie, traversine, massicciata.
+  const pts = [];
+  for (let z = 560; z >= -560; z -= 8) pts.push(new THREE.Vector3(trackX(z), trackY(z), z));
+  const track = new THREE.CatmullRomCurve3(pts);
+  const L = track.getLength();
+  const up = new THREE.Vector3(0, 1, 0);
+  const frameAt = (u) => {
+    const p = track.getPointAt(u), t = track.getTangentAt(u);
+    const r = new THREE.Vector3().crossVectors(t, up).normalize();
+    return { p, t, r };
+  };
+  const railPts = [[], []], ballastV = [], ballastI = [];
+  const samples = Math.floor(L / 2);
+  for (let i = 0; i <= samples; i++) {
+    const { p, r } = frameAt(i / samples);
+    railPts[0].push(p.clone().addScaledVector(r, -0.72).add(new THREE.Vector3(0, 0.32, 0)));
+    railPts[1].push(p.clone().addScaledVector(r, 0.72).add(new THREE.Vector3(0, 0.32, 0)));
+    const a = p.clone().addScaledVector(r, -2.3), b = p.clone().addScaledVector(r, 2.3);
+    ballastV.push(a.x, a.y - 0.02, a.z, b.x, b.y - 0.02, b.z);
+    if (i < samples) { const k = i * 2; ballastI.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const railMat = new THREE.MeshLambertMaterial({ color: 0x8c8f94 });
+  railPts.forEach((rp) => group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rp), samples, 0.09, 4), railMat)));
+  const bg = new THREE.BufferGeometry();
+  bg.setAttribute('position', new THREE.Float32BufferAttribute(ballastV, 3)); bg.setIndex(ballastI); bg.computeVertexNormals();
+  const ballastMesh = new THREE.Mesh(bg, new THREE.MeshLambertMaterial({ color: 0x7f7a72, side: THREE.DoubleSide }));
+  ballastMesh.receiveShadow = true;
+  group.add(ballastMesh);
+  const sleeperCount = Math.floor(L / 1.3);
+  const sleepers = new THREE.InstancedMesh(new THREE.BoxGeometry(2.5, 0.18, 0.45), new THREE.MeshLambertMaterial({ color: 0x6d6258 }), sleeperCount);
+  const m4 = new THREE.Matrix4();
+  for (let i = 0; i < sleeperCount; i++) {
+    const { p, t, r } = frameAt(i / sleeperCount);
+    m4.makeBasis(r, up, t).setPosition(p.x, p.y + 0.12, p.z);
+    sleepers.setMatrixAt(i, m4);
+  }
+  sleepers.receiveShadow = true;
+  group.add(sleepers);
+
+  // Stazione di partenza: marciapiede, fabbricato viaggiatori in tufo, cartello blu.
+  const S0 = 30;
+  {
+    const { p, t, r } = frameAt(S0 / L);
+    const basis = new THREE.Matrix4().makeBasis(r, up, t);
+    const q = new THREE.Quaternion().setFromRotationMatrix(basis);
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.9, 46), new THREE.MeshLambertMaterial({ color: 0xbdb5a5 }));
+    platform.position.copy(p).addScaledVector(r, -3.5).add(new THREE.Vector3(0, 0.45, 0)); platform.quaternion.copy(q);
+    const stMat = new THREE.MeshLambertMaterial({ color: 0xdcc59a });
+    const st = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 18), stMat);
+    st.position.copy(p).addScaledVector(r, -10.5).add(new THREE.Vector3(0, 3, 0)); st.quaternion.copy(q);
+    const roofShape = new THREE.Shape([new THREE.Vector2(-4.6, 0), new THREE.Vector2(4.6, 0), new THREE.Vector2(0, 2.4)]);
+    const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(roofShape, { depth: 19, bevelEnabled: false }), new THREE.MeshLambertMaterial({ color: 0xa4553b }));
+    roof.geometry.translate(0, 0, -9.5);
+    roof.position.copy(st.position).add(new THREE.Vector3(0, 3, 0)); roof.quaternion.copy(q);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.3), new THREE.MeshBasicMaterial({ map: signTexture('Gravina in Puglia'), side: THREE.DoubleSide }));
+    sign.position.copy(p).addScaledVector(r, -4.2).addScaledVector(t, 16).add(new THREE.Vector3(0, 3.6, 0));
+    sign.lookAt(sign.position.clone().sub(t));
+    const postMat = new THREE.MeshLambertMaterial({ color: 0x3b4650 });
+    [-2.4, 2.4].forEach((o) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3.2, 0.15), postMat);
+      post.position.copy(sign.position).addScaledVector(r, o).add(new THREE.Vector3(0, -1.6, 0));
+      group.add(post);
+    });
+    [platform, st, roof].forEach((m) => { m.castShadow = m.receiveShadow = true; });
+    group.add(platform, st, roof, sign);
+  }
+
+  // La città sul ciglio ovest: case di tufo, la cattedrale, e le case scavate che scendono nella gravina.
+  const houseList = [];
+  for (let z = -70; z < 165; z += 5.5) {
+    for (let k = 0; k < 16; k++) {
+      if (R() < 0.34) continue;
+      const w = 4 + R() * 3.5, dpt = 4 + R() * 4, hgt = 4 + R() * 7;
+      const x = ravineX(z) - RH - 1.5 - k * 6.5 - R() * 2;
+      const zz = z + (R() - 0.5) * 2.5;
+      houseList.push({ x, z: zz, w, d: dpt, h: hgt, y: height(x, zz), rim: k === 0 });
+    }
+  }
+  for (let z = -40; z < 150; z += 4.2) {
+    if (R() < 0.4) continue;
+    const t = 0.5 + R() * 0.42;
+    const x = ravineX(z) - t * RH;
+    houseList.push({ x, z: z + (R() - 0.5) * 2, w: 3.4 + R() * 1.6, d: 3.5 + R() * 2, h: 3 + R() * 2, y: height(x, z), rim: true, cave: true });
+  }
+  const houses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), houseList.length);
+  const hc = new THREE.Color();
+  const dummy = new THREE.Object3D();
+  const windows = [], windowHouse = [], houseColors = [];
+  houseList.forEach((h, i) => {
+    dummy.position.set(h.x, h.y - 1.2 + h.h / 2, h.z);
+    dummy.rotation.set(0, (R() - 0.5) * 0.12, 0);
+    dummy.scale.set(h.w, h.h + 2.4, h.d);
+    dummy.updateMatrix();
+    houses.setMatrixAt(i, dummy.matrix);
+    hc.setHex([0xdcc8a0, 0xe8d8b5, 0xcfb78d, 0xd8c091, 0xefe3c8][Math.floor(R() * 5)]);
+    houses.setColorAt(i, hc); houseColors.push(hc.clone());
+    if (h.rim) { windows.push(new THREE.Vector3(h.x + h.w / 2 + 0.06, h.y - 1.2 + (h.h + 2.4) * 0.5 + 0.6, h.z + (R() - 0.5) * h.d * 0.3)); windowHouse.push(i); }
+  });
+  houses.castShadow = houses.receiveShadow = true;
+  group.add(houses);
+
+  // Cattedrale sul ciglio: navata, campanile con cuspide.
+  {
+    const cz = 58, cx = ravineX(cz) - RH - 16, cy = height(cx, cz);
+    const stone = new THREE.MeshLambertMaterial({ color: 0xe2d2ae });
+    const nave = new THREE.Mesh(new THREE.BoxGeometry(12, 13, 32), stone); nave.position.set(cx, cy + 5.5, cz);
+    const roofShape = new THREE.Shape([new THREE.Vector2(-6.8, 0), new THREE.Vector2(6.8, 0), new THREE.Vector2(0, 4.2)]);
+    const roof = new THREE.Mesh(new THREE.ExtrudeGeometry(roofShape, { depth: 33, bevelEnabled: false }), new THREE.MeshLambertMaterial({ color: 0x9a6a4c }));
+    roof.geometry.translate(0, 0, -16.5); roof.position.set(cx, cy + 12, cz);
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(6, 30, 6), stone); tower.position.set(cx + 2, cy + 14, cz - 19);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(4.3, 9, 4), new THREE.MeshLambertMaterial({ color: 0x9a6a4c }));
+    spire.rotation.y = Math.PI / 4; spire.position.set(cx + 2, cy + 33.5, cz - 19);
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(1.6, 16), new THREE.MeshBasicMaterial({ color: 0x3a2c22 }));
+    rose.position.set(cx + 6.05, cy + 8, cz); rose.rotation.y = Math.PI / 2;
+    [nave, roof, tower, spire].forEach((m) => { m.castShadow = m.receiveShadow = true; });
+    group.add(nave, roof, tower, spire, rose);
+    windows.push(new THREE.Vector3(cx + 6.1, cy + 8, cz)); windowHouse.push(-1);
+  }
+
+  // Finestre: spente all'inizio, si accendono quando entrano al centro dello sguardo.
+  const winMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 2.2), new THREE.MeshBasicMaterial({ color: 0xffffff }), windows.length);
+  const unlit = new THREE.Color(0x3a2e26), lit = new THREE.Color(0xffc56b), warm = new THREE.Color(0xffc98a);
+  const glowPos = new Float32Array(windows.length * 3), glowCol = new Float32Array(windows.length * 3);
+  windows.forEach((w, i) => {
+    dummy.position.copy(w); dummy.rotation.set(0, Math.PI / 2, 0); dummy.scale.set(1, 1, 1); dummy.updateMatrix();
+    winMesh.setMatrixAt(i, dummy.matrix); winMesh.setColorAt(i, unlit);
+    glowPos.set([w.x + 0.4, w.y, w.z], i * 3);
+  });
+  group.add(winMesh);
+  const glowGeo = new THREE.BufferGeometry();
+  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
+  glowGeo.setAttribute('color', new THREE.BufferAttribute(glowCol, 3));
+  const glow = new THREE.Points(glowGeo, new THREE.PointsMaterial({
+    size: 16, map: glowTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  group.add(glow);
+  const litFlags = new Array(windows.length).fill(false);
+  const litAt = new Array(windows.length).fill(0);
+  let litCount = 0;
+  $('lights').hidden = false;
+  const updateLights = () => { $('lights').textContent = `Case illuminate: ${litCount} di ${windows.length}`; };
+  updateLights();
+
+  // Il ponte acquedotto: un muro di tufo con arcate che attraversa la gravina.
+  {
+    const zb = -205, xb = ravineX(zb), W = RH * 2 + 18;
+    const shape = new THREE.Shape([new THREE.Vector2(-W / 2, -RD - 4), new THREE.Vector2(W / 2, -RD - 4), new THREE.Vector2(W / 2, 2.5), new THREE.Vector2(-W / 2, 2.5)]);
+    const n = 6, span = (W - 16) / n;
+    for (let i = 0; i < n; i++) {
+      const x0 = -W / 2 + 8 + i * span + 1.6, x1 = x0 + span - 3.2, spring = -9 - Math.abs(i - (n - 1) / 2) * 1.5;
+      const hole = new THREE.Path();
+      hole.moveTo(x0, -RD - 3); hole.lineTo(x1, -RD - 3); hole.lineTo(x1, spring);
+      hole.absarc((x0 + x1) / 2, spring, (x1 - x0) / 2, 0, Math.PI, false);
+      hole.lineTo(x0, -RD - 3);
+      shape.holes.push(hole);
+    }
+    const bridge = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 5, bevelEnabled: false }), new THREE.MeshLambertMaterial({ color: 0xd0b98f }));
+    bridge.geometry.translate(0, 0, -2.5);
+    bridge.position.set(xb, 0, zb);
+    bridge.rotation.y = Math.atan((ravineX(zb + 1) - ravineX(zb - 1)) / 2) * -1;
+    bridge.castShadow = bridge.receiveShadow = true;
+    group.add(bridge);
+  }
+
+  // Ulivi e muretti a secco sul pianoro.
+  const okGround = (x, z, margin) => Math.abs(x - ravineX(z)) > RH + margin && Math.abs(x - trackX(z)) > 9
+    && !(z > -90 && z < 180 && x < ravineX(z) - RH + 4 && x > ravineX(z) - RH - 120) && Math.abs(x) < TW / 2 - 20;
+  const treeN = coarse ? 380 : 620;
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.5, 2.6, 5), new THREE.MeshLambertMaterial({ color: 0x5d4a3a }), treeN);
+  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(2.3, 0), new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true }), treeN);
+  let placed = 0, guard = 0;
+  while (placed < treeN && guard++ < 20000) {
+    const grove = Math.floor(R() * 14);
+    const gx = Math.sin(grove * 12.9) * 420, gz = Math.cos(grove * 7.3) * 600;
+    const x = R() < 0.6 ? gx + (R() - 0.5) * 140 : (R() - 0.5) * TW, z = R() < 0.6 ? gz + (R() - 0.5) * 140 : (R() - 0.5) * TL;
+    if (!okGround(x, z, 6)) continue;
+    const y = height(x, z), s = 0.8 + R() * 0.6;
+    dummy.position.set(x, y + 1.2 * s, z); dummy.rotation.set(0, R() * 6, (R() - 0.5) * 0.2); dummy.scale.set(s, s, s); dummy.updateMatrix();
+    trunks.setMatrixAt(placed, dummy.matrix);
+    dummy.position.set(x, y + 3.3 * s, z); dummy.scale.set(s * (1.1 + R() * 0.4), s * (0.75 + R() * 0.2), s * (1.1 + R() * 0.4)); dummy.updateMatrix();
+    crowns.setMatrixAt(placed, dummy.matrix);
+    crowns.setColorAt(placed, hc.setHex(0x7f8f5c).offsetHSL((R() - 0.5) * 0.03, (R() - 0.5) * 0.1, (R() - 0.5) * 0.08));
+    placed++;
+  }
+  trunks.count = crowns.count = placed;
+  trunks.castShadow = crowns.castShadow = true;
+  group.add(trunks, crowns);
+  const wallN = coarse ? 420 : 700;
+  const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xddd0b0, flatShading: true }), wallN);
+  let wp = 0; guard = 0;
+  while (wp < wallN && guard++ < 20000) {
+    const x = (R() - 0.5) * TW, z = (R() - 0.5) * TL;
+    const ang = (R() < 0.5 ? 0.35 : 0.35 + Math.PI / 2) + (R() - 0.5) * 0.1, len = 6 + R() * 6;
+    const x2 = x + Math.cos(ang) * len, z2 = z + Math.sin(ang) * len;
+    if (!okGround(x, z, 4) || !okGround(x2, z2, 4)) continue;
+    const mx = (x + x2) / 2, mz = (z + z2) / 2;
+    // Tratti corti appoggiati al punto più basso: sul pendio il muretto affonda un po', non galleggia.
+    dummy.position.set(mx, Math.min(height(x, z), height(x2, z2), height(mx, mz)) + 0.35, mz); dummy.rotation.set(0, -ang, 0); dummy.scale.set(len, 1.1, 0.7); dummy.updateMatrix();
+    walls.setMatrixAt(wp++, dummy.matrix);
+  }
+  walls.count = wp;
+  walls.receiveShadow = true;
+  group.add(walls);
+
+  // Nebbia che dorme nella gravina e si dirada con il sole.
+  const mists = [];
+  for (let i = 0; i < 9; i++) {
+    const z = 330 - i * 85, mat = new THREE.MeshBasicMaterial({ map: mistTexture(i + 3), color: 0xfbe7df, transparent: true, opacity: 0.5, depthWrite: false });
+    const mg = new THREE.PlaneGeometry(RH * 1.5, 110); mg.rotateX(-Math.PI / 2);
+    const m = new THREE.Mesh(mg, mat);
+    m.position.set(ravineX(z), -RD + 9 + (i % 3) * 4, z);
+    m.rotation.y = Math.atan((ravineX(z + 1) - ravineX(z - 1)) / 2);
+    mists.push(m); group.add(m);
+  }
+
+  // Grillai (i falchetti di Gravina) che girano sopra il burrone.
+  const birdMat = new THREE.MeshLambertMaterial({ color: 0x6b4630, side: THREE.DoubleSide });
+  const wingGeo = new THREE.BufferGeometry();
+  wingGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.35, 1.9, 0, 0.1, 0, 0, 0.45], 3));
+  wingGeo.computeVertexNormals();
+  const birds = [];
+  for (let i = 0; i < 16; i++) {
+    const b = new THREE.Group();
+    const wl = new THREE.Mesh(wingGeo, birdMat), wr = new THREE.Mesh(wingGeo, birdMat);
+    wr.scale.x = -1;
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.3, 4), birdMat); body.rotation.x = Math.PI / 2;
+    b.add(wl, wr, body);
+    const cz = 180 - (i % 5) * 70;
+    b.userData = { cx: ravineX(cz) + (R() - 0.5) * 30, cz, rad: 16 + R() * 26, y: -10 + R() * 34, sp: (0.25 + R() * 0.25) * (R() < 0.5 ? 1 : -1), ph: R() * 6, wl, wr };
+    birds.push(b); group.add(b);
+  }
+
+  // Il treno FAL: due casse bianche con fascia blu, cabina con parabrezza inclinato.
+  function makeCar(front) {
+    const g = new THREE.Group();
+    const white = new THREE.MeshLambertMaterial({ color: 0xf1f1ec });
+    const blue = new THREE.MeshLambertMaterial({ color: 0x1f4e8c });
+    const glass = new THREE.MeshLambertMaterial({ color: 0x223140, emissive: 0x4a3a22 });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x2c3036 });
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+    add(new THREE.BoxGeometry(3, 3.2, 17), white, 0, 2.35, 0);
+    add(new THREE.BoxGeometry(3.04, 0.95, 14.2), glass, 0, 2.95, 0.4);
+    add(new THREE.BoxGeometry(3.06, 0.42, 17.02), blue, 0, 1.45, 0);
+    add(new THREE.BoxGeometry(2.5, 0.4, 15.5), new THREE.MeshLambertMaterial({ color: 0x9aa0a6 }), 0, 4.1, 0);
+    add(new THREE.BoxGeometry(2.3, 0.8, 2.8), dark, 0, 0.6, 5.6);
+    add(new THREE.BoxGeometry(2.3, 0.8, 2.8), dark, 0, 0.6, -5.6);
+    if (front) {
+      const nose = add(new THREE.BoxGeometry(2.96, 1.5, 0.3), glass, 0, 3.05, -8.62); nose.rotation.x = 0.28;
+      add(new THREE.BoxGeometry(3.02, 0.6, 0.25), blue, 0, 1.45, -8.55);
+      const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1c9 });
+      add(new THREE.BoxGeometry(0.45, 0.3, 0.1), lamp, -0.95, 1.95, -8.53);
+      add(new THREE.BoxGeometry(0.45, 0.3, 0.1), lamp, 0.95, 1.95, -8.53);
+    }
+    return g;
+  }
+  const cars = [makeCar(true), makeCar(false)];
+  cars.forEach((c) => group.add(c));
+  const place = (obj, s) => {
+    const u = clamp(s / L, 0, 1);
+    const p = track.getPointAt(u), t = track.getTangentAt(u);
+    obj.position.copy(p).add(new THREE.Vector3(0, 0.25, 0));
+    obj.lookAt(p.x - t.x, p.y + 0.25 - t.y, p.z - t.z);
+  };
+
+  // Luce e colori dell'alba: il sole sale da est (lato del treno) durante la tappa.
+  const skyTop = C(0x4d6594), skyTop2 = C(0x7b9cc6);
+  const skyHor = C(0xf0c7b4), skyHor2 = C(0xf6dcc6);
+  const skyGlow = C(0xf7a060), skyGlow2 = C(0xfbd3a0);
+  const skyBelt = C(0xe4aab6), skyBelt2 = C(0xe9cfd2);
+  const fogA = C(0xe9c3b9), fogB = C(0xeedad0);
+  const sunA = C(0xff8a4c), sunB = C(0xffcf94);
+  const hemiSkyA = C(0xc9c3e0), hemiSkyB = C(0xdfe3ee), hemiGround = C(0x8d7a5c);
+
+  const score = {
+    bpm: 66, stepsPerChord: 16, skip: 0.18, sparkle: 0.1, padGain: 0.016, padCutoff: 780, wind: 0.022,
+    pattern: [null, 2, 3, 4, 3, 2, 3, 1],
+    // Re maggiore: D, Bm, G, A (con note basse prima). Arpeggi pizzicati lenti, come un mandolino all'alba.
+    chords: [[50, 57, 62, 66, 69], [47, 54, 59, 62, 66], [43, 50, 55, 59, 62], [45, 52, 57, 61, 64]],
+  };
+
+  let s = S0, speed = 0, clock = 0, departed = false, finished = false, clackAt = 0;
+  const END = L - 70;
+  const V = 13.5;
+  place(cars[0], s); place(cars[1], s - 17.6);
+
+  const focus = new THREE.Vector3(), camPos = new THREE.Vector3(), camTarget = new THREE.Vector3();
+  const tmpV = new THREE.Vector3(), fwd = new THREE.Vector3();
+  let camInit = false;
+
+  function update(dt, active) {
+    clock += dt;
+    // Partenza dopo qualche secondo, accelerazione dolce, velocità costante, poi il treno rallenta a fine tappa.
+    if (active && !departed && clock > 3.5) { departed = true; Sound.horn(); }
+    const target = !departed ? 0 : s > END ? 5 : V;
+    speed = lerp(speed, target, 1 - Math.exp(-dt * (departed && speed < 4 ? 0.35 : 0.6)));
+    s = Math.min(s + speed * dt, L - 20);
+    place(cars[0], s); place(cars[1], s - 17.6);
+    Sound.engine(speed);
+    const joint = 18;
+    if (speed > 0.5 && s > clackAt) { Sound.clack(speed); clackAt = s + joint; }
+
+    const prog = clamp((s - S0) / (END - S0), 0, 1);
+    $('legprogress').style.width = `${(prog * 100).toFixed(1)}%`;
+    if (!finished && s >= END) { finished = true; finishLeg(); }
+
+    // Alba che avanza.
+    const k = smooth(0, 1, prog);
+    const elev = lerp(0.08, 0.2, k);
+    const sunDir = tmpV.set(Math.cos(elev), Math.sin(elev), -0.32).normalize();
+    sky.uniforms.sunDir.value.copy(sunDir);
+    sky.uniforms.top.value.copy(skyTop).lerp(skyTop2, k);
+    sky.uniforms.horizon.value.copy(skyHor).lerp(skyHor2, k);
+    sky.uniforms.glow.value.copy(skyGlow).lerp(skyGlow2, k);
+    sky.uniforms.belt.value.copy(skyBelt).lerp(skyBelt2, k);
+    sky.uniforms.ground.value.copy(fogA).lerp(fogB, k);
+    sky.uniforms.sunColor.value.copy(sunA).lerp(sunB, k);
+    scene.fog.color.copy(fogA).lerp(fogB, k);
+    hillMat.color.copy(scene.fog.color).lerp(C(0x8d86a0), 0.45);
+    sun.color.copy(sunA).lerp(sunB, k);
+    sun.intensity = lerp(2.0, 3.0, k);
+    hemi.color.copy(hemiSkyA).lerp(hemiSkyB, k); hemi.groundColor.copy(hemiGround); hemi.intensity = lerp(1.25, 1.6, k);
+    const fp = cars[0].position;
+    sun.position.copy(fp).addScaledVector(sunDir, 400);
+    sun.target.position.copy(fp);
+    mists.forEach((m, i) => { m.material.opacity = lerp(0.55, 0.12, k); m.material.map.offset.x += dt * 0.004 * (i % 2 ? 1 : -1); });
+
+    birds.forEach((b) => {
+      const u = b.userData, a = u.ph + clock * u.sp;
+      b.position.set(u.cx + Math.cos(a) * u.rad, u.y + Math.sin(clock * 0.7 + u.ph) * 2, u.cz + Math.sin(a) * u.rad);
+      b.rotation.y = -a + (u.sp > 0 ? 0 : Math.PI);
+      b.rotation.z = u.sp > 0 ? -0.25 : 0.25;
+      const flap = Math.sin(clock * 11 + u.ph) * 0.5;
+      u.wl.rotation.z = flap; u.wr.rotation.z = -flap;
+    });
+
+    // Camera: orbita dietro e a destra del treno e guarda oltre, verso la gravina.
+    const u = clamp(s / L, 0, 1);
+    const t = track.getTangentAt(u);
+    const right = fwd.crossVectors(t, up).normalize();
+    const behind = t.clone().negate();
+    const base = Math.atan2(behind.x * 0.72 + right.x * 0.7, behind.z * 0.72 + right.z * 0.7);
+    const yaw = base + look.yaw, pitch = 0.36 + look.pitch, dist = coarse ? 42 : 38;
+    focus.copy(fp).add(new THREE.Vector3(0, 3, 0));
+    const want = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(dist).add(focus);
+    want.y = Math.max(want.y, height(want.x, want.z) + 2.5);
+    const lookAt = focus.clone().add(new THREE.Vector3(-Math.sin(yaw) * 40, -12 - look.pitch * 10, -Math.cos(yaw) * 40));
+    if (!camInit) { camPos.copy(want); camTarget.copy(lookAt); camInit = true; }
+    const damp = 1 - Math.exp(-dt * 3.2);
+    camPos.lerp(want, damp); camTarget.lerp(lookAt, damp);
+    if (!reducedMotion) camPos.y += Math.sin(clock * 1.7) * 0.02 * speed / V;
+    camera.position.copy(camPos); camera.lookAt(camTarget);
+
+    // Finestre al centro dello sguardo: si accendono e suonano una nota.
+    if (active) {
+      camera.getWorldDirection(fwd);
+      for (let i = 0; i < windows.length; i++) {
+        if (litFlags[i]) continue;
+        tmpV.subVectors(windows[i], camera.position);
+        const dist2 = tmpV.length();
+        if (dist2 > 340 || tmpV.dot(fwd) / dist2 < 0.989) continue;
+        litFlags[i] = true; litAt[i] = clock; litCount++;
+        winMesh.setColorAt(i, lit); winMesh.instanceColor.needsUpdate = true;
+        if (windowHouse[i] >= 0) { houses.setColorAt(windowHouse[i], houseColors[windowHouse[i]].clone().lerp(warm, 0.55)); houses.instanceColor.needsUpdate = true; }
+        Sound.chime(); updateLights();
+      }
+    }
+    let glowDirty = false;
+    for (let i = 0; i < windows.length; i++) {
+      if (!litFlags[i]) continue;
+      const age = clock - litAt[i];
+      const f = age < 1.2 ? age / 1.2 : 1;
+      const flick = 0.85 + 0.15 * Math.sin(clock * 3 + i);
+      const v = f * flick * (1 - k * 0.35);
+      if (Math.abs(glowCol[i * 3] - v) > 0.01) { glowCol[i * 3] = v; glowCol[i * 3 + 1] = v * 0.7; glowCol[i * 3 + 2] = v * 0.35; glowDirty = true; }
+    }
+    if (glowDirty) glowGeo.attributes.color.needsUpdate = true;
+  }
+
+  return {
+    group, update, score,
+    summary: () => (litCount
+      ? `Hai acceso ${litCount} case di Gravina su ${windows.length}. Il treno prosegue verso Altamura e la Murgia.`
+      : 'Il treno prosegue verso Altamura e la Murgia.'),
+  };
+}
+
+/* --------------------------------------------- Ciclo ------------------------------------------------- */
+let last = performance.now(), slowFrames = 0, frames = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  applyKeys(dt);
+  const d = 1 - Math.exp(-dt * 5);
+  look.yaw = lerp(look.yaw, look.ty, d); look.pitch = lerp(look.pitch, look.tp, d);
+  leg.update(dt, started);
+  if (started) Sound.birds(dt);
+  sky.mesh.position.copy(camera.position);
+  renderer.render(scene, camera);
+
+  // 60 fps prima di tutto: se il computer fatica, meno pixel e poi niente ombre.
+  frames++;
+  if (dt > 0.024) slowFrames++;
+  if (frames >= 120) {
+    if (slowFrames > 50) {
+      if (pixelRatio > 1) { pixelRatio = 1; renderer.setPixelRatio(1); renderer.setSize(innerWidth, innerHeight, false); }
+      else if (shadowsOn) { shadowsOn = false; renderer.shadowMap.enabled = false; sun.castShadow = false; scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; }); }
+    }
+    frames = slowFrames = 0;
+  }
+  requestAnimationFrame(frame);
+}
+
+function boot(data = {}) {
+  startLeg(clamp(data.leg ?? 0, 0, 0));
+  requestAnimationFrame(frame);
+  window.claude?.hot?.snapshot?.(() => ({ leg: legIndex }));
+}
+$('start').addEventListener('click', () => {
+  started = true;
+  $('startcard').hidden = true;
+  Sound.start();
+  Sound.playLeg(leg.score);
+  showTitle(LEGS[legIndex]);
+  showHint(coarse ? 'Trascina con un dito per guardarti intorno' : 'Trascina, scorri con il trackpad o usa le frecce per guardarti intorno');
+  canvas.focus({ preventScroll: true });
+});
+window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>

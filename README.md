@@ -58,10 +58,24 @@ sospesa domenica e festivi; festività nazionali IT incluse Pasquetta in `servic
 ## Voli e classifica (`server/src/services/ranking.js`)
 Nessuna API voli: durata stimata dalla distanza (30 min + 750 km/h) e link a Google Voli e Skyscanner
 (senza affiliazione). Il totale porta a porta include 2 h in aeroporto prima del volo e 30 min all'uscita.
-Due priorità, niente "più economico" (senza prezzi sarebbe inventato):
+Due priorità, niente "più economico" (i prezzi sono solo stime, sotto):
 - **Più veloce**: tempi reali dei mezzi pubblici; dove mancano, la stima in auto pesa ×1,5 + 30 min.
 - **Equilibrato**: come sopra, più 15 min per cambio, 45 min per tratta in auto, 20 min se manca il tratto a piedi.
 Il server manda entrambi i punteggi: il frontend mostra i primi 5 itinerari e riordina senza nuova ricerca.
+
+## Prezzi indicativi (`server/src/services/fares.js`)
+Nessuna API di prezzi: ogni tratta ha una forbice `{ lo, hi }` in euro (a persona, sola andata, senza sconti),
+mostrata come "circa" e spiegata nella pagina. Ogni parametro ha la fonte nel codice:
+- Treni regionali e bus extraurbani: tariffa Trenitalia 39/14 Puglia (dall'11/02/2026, ~0,088 €/km, minimo 1,30 €),
+  massimo +40% per le regioni più care; biglietto urbano 1,30–2,20 €; tratti consecutivi della stessa azienda =
+  un solo biglietto. Alta velocità, pullman e traghetti: forbici ampie (prezzi dinamici). Km dei tratti = linea
+  d'aria tra le fermate × 1,2 (i risultati in cache senza coordinate usano durata × velocità tipica).
+- Altri paesi: prezzi scalati con il livello dei prezzi dei servizi di trasporto Eurostat 2024 rispetto all'Italia
+  (`server/src/data/price-levels.json`, rigenerabile dall'API Eurostat `prc_ppp_ind`).
+- Tratte note: prezzo pubblicato dall'operatore (`fareEur` in `known-links.json`, con `fareSource`).
+- Volo: da 0,6× a 2× un prezzo tipico `25 € + 0,02 €/km`, tarato sul prezzo medio Ryanair FY2026 (50,60 €).
+- Auto: 0,12–0,20 €/km (carburante, pedaggi), parcheggio escluso; taxi mostrato a parte.
+I prezzi non entrano nella classifica.
 
 ## Database
 In locale, senza `DATABASE_URL`, si usa PGlite (`server/.pglite/`). Con `NODE_ENV=production` il server
