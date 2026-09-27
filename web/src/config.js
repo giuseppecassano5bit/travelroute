@@ -7,4 +7,4 @@ export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 export const SLOW_REQUEST_MS = 3000;
 
 // Repository pubblico del codice (AGPL-3.0: chi usa il sito deve poter avere i sorgenti). Link nel footer.
-export const SOURCE_URL = import.meta.env.VITE_SOURCE_URL || null;
+export const SOURCE_URL = import.meta.env.VITE_SOURCE_URL || 'https://github.com/giuseppecassano5bit/travelroute';

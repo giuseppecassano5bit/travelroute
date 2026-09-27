@@ -85,9 +85,16 @@ In locale, senza `DATABASE_URL`, si usa PGlite (`server/.pglite/`). Con `NODE_EN
 Non ci sono account: ogni IP ha `DAILY_SEARCHES` ricerche al giorno (default 15), contate nel DB (`search_usage`)
 con un hash troncato e salato dell'IP, mai l'indirizzo in chiaro. Serve a restare leggeri su Transitous.
 
+## Viaggio 3D (`web/public/viaggio.html`)
+Il viaggio d'esempio (Gravina → Karlovo) in sei tappe, in un solo file con three.js r158 da cdnjs: tutto procedurale
+(niente modelli, texture o suoni scaricati), musica generata con Web Audio. La homepage mostra solo un'anteprima
+leggera; il 3D si carica al clic su "Fai questo viaggio in 3D". `viaggio.html#tappa3` apre direttamente una tappa.
+Sistemi condivisi: `railLeg()` (terreno, binario, treno, camera, luce della tappa, "sguardo che risveglia"),
+`buildFlight()` per il volo, `SCORE`/`PAL` per musica e colori di ogni tappa.
+
 ## Licenza
 Codice: [GNU AGPL-3.0 o successiva](LICENSE). Chi mette online una versione modificata deve pubblicarne i
-sorgenti: il footer mostra il link "Codice sorgente" quando `VITE_SOURCE_URL` è impostata (obbligatorio in produzione).
+sorgenti: il footer mostra il link "Codice sorgente" (https://github.com/giuseppecassano5bit/travelroute, o `VITE_SOURCE_URL`).
 I dati in `server/src/data/` restano con le loro licenze: GeoNames CC BY 4.0, OurAirports pubblico dominio,
 fermate da Transitous (licenze delle fonti su transitous.org/sources), orari delle tratte note dai siti degli operatori.
 
